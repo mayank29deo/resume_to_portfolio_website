@@ -3,8 +3,28 @@
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pdfParse = require("pdf-parse");
-  const result = await pdfParse(buffer);
-  return result.text as string;
+  try {
+    const result = await pdfParse(buffer);
+    return result.text as string;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // pdf-parse throws raw pdf.js errors for corrupted/non-standard PDFs
+    if (
+      msg.includes("XRef") ||
+      msg.includes("xref") ||
+      msg.includes("Invalid PDF") ||
+      msg.includes("Bad") ||
+      msg.includes("bad")
+    ) {
+      throw new Error(
+        "Your PDF could not be parsed — it may be corrupted or use an unsupported format. " +
+        "Please try one of these fixes: (1) Open the PDF in Adobe Acrobat or Preview and re-save it, " +
+        "(2) Re-export it as PDF from Word/Google Docs, or " +
+        "(3) Convert it at ilovepdf.com before uploading."
+      );
+    }
+    throw err;
+  }
 }
 
 export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
