@@ -14,6 +14,7 @@ export default function Navbar({ personal, portfolioId }: { personal: Personal; 
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
   const initials = personal.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   useEffect(() => {
@@ -21,6 +22,10 @@ export default function Navbar({ personal, portfolioId }: { personal: Personal; 
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    setIsOwner(localStorage.getItem(`portfolio_owner_${portfolioId}`) === "true");
+  }, [portfolioId]);
 
   const scrollTo = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault(); setActive(href);
@@ -54,7 +59,7 @@ export default function Navbar({ personal, portfolioId }: { personal: Personal; 
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Open to Work
             </span>
           )}
-          <a href={`/p/${portfolioId}/edit`} className="btn-outline text-xs">Edit Portfolio</a>
+          {isOwner && <a href={`/p/${portfolioId}/edit`} className="btn-outline text-xs">Edit Portfolio</a>}
         </div>
 
         <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-slate-400 hover:text-white">
@@ -70,7 +75,7 @@ export default function Navbar({ personal, portfolioId }: { personal: Personal; 
             <a key={l.href} href={l.href} onClick={(e) => { scrollTo(e, l.href); setMenuOpen(false); }}
               className="block py-3 text-sm text-slate-400 hover:text-white border-b border-white/5 last:border-0">{l.label}</a>
           ))}
-          <a href={`/p/${portfolioId}/edit`} className="btn-outline inline-block mt-4 text-xs">Edit Portfolio</a>
+          {isOwner && <a href={`/p/${portfolioId}/edit`} className="btn-outline inline-block mt-4 text-xs">Edit Portfolio</a>}
         </div>
       )}
     </nav>

@@ -25,6 +25,7 @@ export default function UploadSection() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Something went wrong");
       setState("done");
+      localStorage.setItem(`portfolio_owner_${json.id}`, "true");
       router.push(`/p/${json.id}`);
     } catch (e: unknown) {
       setState("error");
