@@ -1,23 +1,19 @@
 import fs from "fs";
 import path from "path";
+import { Pool } from "pg";
 import type { PortfolioData, PortfolioRow } from "./types";
 
 // ── Use Postgres in production; fall back to a local JSON file in dev ─────────
 const USE_POSTGRES = !!process.env.POSTGRES_URL;
 
-// ── Postgres pool (lazy singleton) ───────────────────────────────────────────
-let _pool: import("pg").Pool | null = null;
-
-async function getPool(): Promise<import("pg").Pool> {
-  if (!_pool) {
-    const { Pool } = await import("pg");
-    _pool = new Pool({
+// ── Postgres pool (module-level singleton, static import) ─────────────────────
+const pool = USE_POSTGRES
+  ? new Pool({
       connectionString: process.env.POSTGRES_URL,
       ssl: { rejectUnauthorized: false },
-    });
-  }
-  return _pool;
-}
+      max: 5,
+    })
+  : null;
 
 // ── Local JSON file storage ───────────────────────────────────────────────────
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -42,8 +38,7 @@ function writeLocalDB(db: LocalDB): void {
 // ── Exported DB functions ─────────────────────────────────────────────────────
 
 export async function ensureTable(): Promise<void> {
-  if (!USE_POSTGRES) return;
-  const pool = await getPool();
+  if (!pool) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS portfolios (
       id          VARCHAR(12)  PRIMARY KEY,
@@ -58,14 +53,13 @@ export async function createPortfolio(
   id: string,
   data: PortfolioData
 ): Promise<void> {
-  if (!USE_POSTGRES) {
+  if (!pool) {
     const db = readLocalDB();
     const now = new Date().toISOString();
     db.portfolios[id] = { id, data, created_at: now, updated_at: now };
     writeLocalDB(db);
     return;
   }
-  const pool = await getPool();
   await pool.query(
     "INSERT INTO portfolios (id, data) VALUES ($1, $2)",
     [id, JSON.stringify(data)]
@@ -73,11 +67,10 @@ export async function createPortfolio(
 }
 
 export async function getPortfolio(id: string): Promise<PortfolioRow | null> {
-  if (!USE_POSTGRES) {
+  if (!pool) {
     const db = readLocalDB();
     return db.portfolios[id] ?? null;
   }
-  const pool = await getPool();
   const { rows } = await pool.query<PortfolioRow>(
     "SELECT * FROM portfolios WHERE id = $1 LIMIT 1",
     [id]
@@ -89,7 +82,7 @@ export async function updatePortfolio(
   id: string,
   data: PortfolioData
 ): Promise<void> {
-  if (!USE_POSTGRES) {
+  if (!pool) {
     const db = readLocalDB();
     if (db.portfolios[id]) {
       db.portfolios[id].data = data;
@@ -98,7 +91,6 @@ export async function updatePortfolio(
     }
     return;
   }
-  const pool = await getPool();
   await pool.query(
     "UPDATE portfolios SET data = $1, updated_at = NOW() WHERE id = $2",
     [JSON.stringify(data), id]
