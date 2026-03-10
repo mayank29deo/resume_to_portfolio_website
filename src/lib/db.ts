@@ -1,18 +1,20 @@
+import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
-import { Pool } from "pg";
 import type { PortfolioData, PortfolioRow } from "./types";
 
-// ── Use Postgres in production; fall back to a local JSON file in dev ─────────
-const USE_POSTGRES = !!process.env.POSTGRES_URL;
+// ── Use Supabase in production; fall back to local JSON file in dev ───────────
+const USE_SUPABASE = !!(
+  process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
+);
 
-// ── Postgres pool (module-level singleton, static import) ─────────────────────
-const pool = USE_POSTGRES
-  ? new Pool({
-      connectionString: process.env.POSTGRES_URL,
-      ssl: { rejectUnauthorized: false },
-      max: 5,
-    })
+// Supabase client uses HTTPS — no SSL certificate issues
+const supabase = USE_SUPABASE
+  ? createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { persistSession: false } }
+    )
   : null;
 
 // ── Local JSON file storage ───────────────────────────────────────────────────
@@ -37,52 +39,45 @@ function writeLocalDB(db: LocalDB): void {
 
 // ── Exported DB functions ─────────────────────────────────────────────────────
 
+// Table is created once via Supabase SQL Editor — see setup instructions
 export async function ensureTable(): Promise<void> {
-  if (!pool) return;
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS portfolios (
-      id          VARCHAR(12)  PRIMARY KEY,
-      data        JSONB        NOT NULL,
-      created_at  TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at  TIMESTAMPTZ  DEFAULT NOW()
-    )
-  `);
+  return; // no-op: table managed via Supabase dashboard
 }
 
 export async function createPortfolio(
   id: string,
   data: PortfolioData
 ): Promise<void> {
-  if (!pool) {
+  if (!supabase) {
     const db = readLocalDB();
     const now = new Date().toISOString();
     db.portfolios[id] = { id, data, created_at: now, updated_at: now };
     writeLocalDB(db);
     return;
   }
-  await pool.query(
-    "INSERT INTO portfolios (id, data) VALUES ($1, $2)",
-    [id, JSON.stringify(data)]
-  );
+  const { error } = await supabase.from("portfolios").insert({ id, data });
+  if (error) throw new Error(error.message);
 }
 
 export async function getPortfolio(id: string): Promise<PortfolioRow | null> {
-  if (!pool) {
+  if (!supabase) {
     const db = readLocalDB();
     return db.portfolios[id] ?? null;
   }
-  const { rows } = await pool.query<PortfolioRow>(
-    "SELECT * FROM portfolios WHERE id = $1 LIMIT 1",
-    [id]
-  );
-  return rows[0] ?? null;
+  const { data, error } = await supabase
+    .from("portfolios")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !data) return null;
+  return data as PortfolioRow;
 }
 
 export async function updatePortfolio(
   id: string,
   data: PortfolioData
 ): Promise<void> {
-  if (!pool) {
+  if (!supabase) {
     const db = readLocalDB();
     if (db.portfolios[id]) {
       db.portfolios[id].data = data;
@@ -91,8 +86,9 @@ export async function updatePortfolio(
     }
     return;
   }
-  await pool.query(
-    "UPDATE portfolios SET data = $1, updated_at = NOW() WHERE id = $2",
-    [JSON.stringify(data), id]
-  );
+  const { error } = await supabase
+    .from("portfolios")
+    .update({ data, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 }
