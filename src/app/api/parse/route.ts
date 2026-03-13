@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractText } from "@/lib/parser";
+import { extractText, extractLinkedInFromLinks } from "@/lib/parser";
 import { extractPortfolioData, mergeLinkedInUpdates } from "@/lib/claude";
 import { fetchLinkedInData } from "@/lib/linkedin";
 import { createPortfolio, ensureTable } from "@/lib/db";
@@ -55,8 +55,11 @@ export async function POST(req: NextRequest) {
     // Step 1: Parse resume with Claude
     let portfolioData = await extractPortfolioData(resumeText);
 
-    // Step 2: Auto-extract LinkedIn URL from resume text and merge any new entries
-    const linkedinUrl = extractLinkedInFromResume(resumeText);
+    // Step 2: Auto-extract LinkedIn URL — prefer embedded hyperlinks over plain text
+    // (clickable links in the PDF/DOCX carry the exact canonical URL the user set)
+    const linkedinUrl =
+      (await extractLinkedInFromLinks(buffer, file.type, file.name)) ??
+      extractLinkedInFromResume(resumeText);
     let linkedInResult: {
       status: string;
       added: { experience: number; projects: number };
