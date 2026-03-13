@@ -19,7 +19,8 @@ function extractLinkedInFromPDFLinks(buffer: Buffer): string | null {
   const raw = buffer.toString("latin1");
   // Match both /URI (url) and the rare /URI<url> forms
   const re = /\/URI\s*[\(<]([^)>]*linkedin\.com\/in\/[^)>]+)[\)>]/gi;
-  for (const match of raw.matchAll(re)) {
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(raw)) !== null) {
     const found = normaliseLinkedIn(match[1].trim());
     if (found) return found;
   }
@@ -35,7 +36,9 @@ async function extractLinkedInFromDOCXLinks(buffer: Buffer): Promise<string | nu
   const mammoth = require("mammoth");
   const { value: html } = await mammoth.convertToHtml({ buffer });
   const re = /href="([^"]*linkedin\.com\/in\/[^"]+)"/gi;
-  for (const match of (html as string).matchAll(re)) {
+  const htmlStr = html as string;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(htmlStr)) !== null) {
     const found = normaliseLinkedIn(match[1]);
     if (found) return found;
   }
