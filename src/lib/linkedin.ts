@@ -39,7 +39,7 @@ function buildDuration(
   return `${start} – ${end}`;
 }
 
-// Proxycurl person profile response shape (only fields we use)
+// Enrich Layer (formerly Proxycurl) person profile response shape (only fields we use)
 interface ProxycurlExperience {
   title?: string;
   company?: string;
@@ -63,14 +63,14 @@ interface ProxycurlProfile {
 }
 
 export async function fetchLinkedInData(profileUrl: string): Promise<LinkedInData> {
-  const apiKey = process.env.PROXYCURL_API_KEY;
+  const apiKey = process.env.ENRICHLAYER_API_KEY;
 
   if (!apiKey) {
     return {
       experience: [],
       projects: [],
       fetchStatus: "blocked",
-      message: "Proxycurl API key not configured.",
+      message: "Enrich Layer API key not configured.",
     };
   }
 
@@ -87,8 +87,9 @@ export async function fetchLinkedInData(profileUrl: string): Promise<LinkedInDat
   }
 
   try {
-    const apiUrl = new URL("https://nubela.co/proxycurl/api/v2/linkedin");
-    apiUrl.searchParams.set("url", url);
+    // Enrich Layer API (formerly Proxycurl / nubela.co)
+    const apiUrl = new URL("https://enrichlayer.com/api/v2/profile");
+    apiUrl.searchParams.set("profile_url", url);
     apiUrl.searchParams.set("skills", "exclude");
     apiUrl.searchParams.set("inferred_salary", "exclude");
     apiUrl.searchParams.set("personal_email", "exclude");
@@ -115,7 +116,7 @@ export async function fetchLinkedInData(profileUrl: string): Promise<LinkedInDat
         experience: [],
         projects: [],
         fetchStatus: "blocked",
-        message: "Invalid Proxycurl API key.",
+        message: "Invalid Enrich Layer API key.",
       };
     }
 
@@ -124,7 +125,7 @@ export async function fetchLinkedInData(profileUrl: string): Promise<LinkedInDat
         experience: [],
         projects: [],
         fetchStatus: "blocked",
-        message: `Proxycurl returned ${response.status} — skipping LinkedIn sync.`,
+        message: `Enrich Layer returned ${response.status} — skipping LinkedIn sync.`,
       };
     }
 
@@ -166,7 +167,7 @@ export async function fetchLinkedInData(profileUrl: string): Promise<LinkedInDat
       experience: [],
       projects: [],
       fetchStatus: "blocked",
-      message: `Could not reach Proxycurl (${
+      message: `Could not reach Enrich Layer (${
         err instanceof Error ? err.message : "network error"
       }) — skipping LinkedIn sync.`,
     };
